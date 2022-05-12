@@ -1,0 +1,4 @@
+{
+  "subdir": "pdfium/buildtools/mac",
+  "package_name": "gn/gn/mac-arm64"
+}
