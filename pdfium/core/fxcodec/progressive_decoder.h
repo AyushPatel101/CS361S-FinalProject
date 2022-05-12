@@ -236,6 +236,7 @@ class ProgressiveDecoder final :
 #endif  // PDF_ENABLE_XFA_PNG
 #ifdef PDF_ENABLE_XFA_TIFF
   std::unique_ptr<ProgressiveDecoderIface::Context> m_pTiffContext;
+  rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox;
 #endif  // PDF_ENABLE_XFA_TIFF
   uint32_t m_offSet = 0;
   int m_ScanlineSize = 0;

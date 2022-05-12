@@ -36,7 +36,12 @@
 
 #ifdef PDF_ENABLE_XFA_TIFF
 #include "core/fxcodec/tiff/tiff_decoder.h"
+#define RLBOX_SINGLE_THREADED_INVOCATIONS
+#include "rlbox_wasm2c_sandbox.hpp"
+#include "rlbox.hpp"
 #endif  // PDF_ENABLE_XFA_TIFF
+
+
 
 namespace fxcodec {
 
@@ -1243,15 +1248,20 @@ FXCODEC_STATUS ProgressiveDecoder::PngContinueDecode() {
 #endif  // PDF_ENABLE_XFA_PNG
 
 #ifdef PDF_ENABLE_XFA_TIFF
+//sandbox
 bool ProgressiveDecoder::TiffDetectImageTypeFromFile(
     CFX_DIBAttribute* pAttribute) {
-  m_pTiffContext = TiffDecoder::CreateDecoder(m_pFile);
+
+  //change
+  sandbox.create_sandbox("./my_lib.so");
+
+  m_pTiffContext = TiffDecoder::CreateDecoder(sandbox, m_pFile);
   if (!m_pTiffContext) {
     m_status = FXCODEC_STATUS::kError;
     return false;
   }
   int32_t dummy_bpc;
-  bool ret = TiffDecoder::LoadFrameInfo(m_pTiffContext.get(), 0, &m_SrcWidth,
+  bool ret = TiffDecoder::LoadFrameInfo(sandbox, m_pTiffContext.get(), 0, &m_SrcWidth,
                                         &m_SrcHeight, &m_SrcComponents,
                                         &dummy_bpc, pAttribute);
   m_SrcComponents = 4;
@@ -1263,7 +1273,7 @@ bool ProgressiveDecoder::TiffDetectImageTypeFromFile(
   }
   return true;
 }
-
+//sandbox
 FXCODEC_STATUS ProgressiveDecoder::TiffContinueDecode() {
   bool ret = false;
   if (m_pDeviceBitmap->GetBPP() == 32 &&
@@ -1272,7 +1282,7 @@ FXCODEC_STATUS ProgressiveDecoder::TiffContinueDecode() {
       m_startX == 0 && m_startY == 0 && m_clipBox.left == 0 &&
       m_clipBox.top == 0 && m_clipBox.right == m_SrcWidth &&
       m_clipBox.bottom == m_SrcHeight) {
-    ret = TiffDecoder::Decode(m_pTiffContext.get(), m_pDeviceBitmap);
+    ret = TiffDecoder::Decode(sandbox, m_pTiffContext.get(), m_pDeviceBitmap);
     m_pDeviceBitmap = nullptr;
     m_pFile = nullptr;
     if (!ret) {
@@ -1291,7 +1301,7 @@ FXCODEC_STATUS ProgressiveDecoder::TiffContinueDecode() {
     m_status = FXCODEC_STATUS::kError;
     return m_status;
   }
-  ret = TiffDecoder::Decode(m_pTiffContext.get(), pDIBitmap);
+  ret = TiffDecoder::Decode(sandbox, m_pTiffContext.get(), pDIBitmap);
   if (!ret) {
     m_pDeviceBitmap = nullptr;
     m_pFile = nullptr;
@@ -1407,6 +1417,7 @@ bool ProgressiveDecoder::DetectImageType(FXCODEC_IMAGE_TYPE imageType,
                                          CFX_DIBAttribute* pAttribute) {
 #ifdef PDF_ENABLE_XFA_TIFF
   if (imageType == FXCODEC_IMAGE_TIFF)
+  //create sanddbox?
     return TiffDetectImageTypeFromFile(pAttribute);
 #endif  // PDF_ENABLE_XFA_TIFF
 
