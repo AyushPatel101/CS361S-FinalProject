@@ -1409,6 +1409,8 @@ FXCODEC_STATUS ProgressiveDecoder::TiffContinueDecode() {
   m_pDeviceBitmap = nullptr;
   m_pFile = nullptr;
   m_status = FXCODEC_STATUS::kDecodeFinished;
+  //change?
+  sandbox.destory_sandbox();
   return m_status;
 }
 #endif  // PDF_ENABLE_XFA_TIFF

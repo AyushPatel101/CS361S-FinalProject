@@ -20,22 +20,21 @@ class CFX_DIBitmap;
 class IFX_SeekableReadStream;
 
 namespace fxcodec {
-
 class CFX_DIBAttribute;
 
 class TiffDecoder {
  public:
-  static std::unique_ptr<ProgressiveDecoderIface::Context> CreateDecoder(
+  static std::unique_ptr<ProgressiveDecoderIface::Context> CreateDecoder(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox,
       const RetainPtr<IFX_SeekableReadStream>& file_ptr);
 
-  static bool LoadFrameInfo(ProgressiveDecoderIface::Context* ctx,
+  static bool LoadFrameInfo(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox,ProgressiveDecoderIface::Context* ctx,
                             int32_t frame,
                             int32_t* width,
                             int32_t* height,
                             int32_t* comps,
                             int32_t* bpc,
                             CFX_DIBAttribute* pAttribute);
-  static bool Decode(ProgressiveDecoderIface::Context* ctx,
+  static bool Decode(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox,ProgressiveDecoderIface::Context* ctx,
                      const RetainPtr<CFX_DIBitmap>& pDIBitmap);
 
   TiffDecoder() = delete;
