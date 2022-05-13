@@ -33,7 +33,8 @@ extern "C" {
 }  // extern C
 
 #define RLBOX_SINGLE_THREADED_INVOCATIONS
-#include "rlbox_wasm2c_sandbox.hpp"
+#define RLBOX_USEstatic_CALLS() rlbox_noop_sandbox_lookup_symbol
+#include "rlbox_noop_sandbox.hpp"
 #include "rlbox.hpp"
 using namespace rlbox;
 
@@ -51,33 +52,33 @@ class CTiffContext final : public ProgressiveDecoderIface::Context {
   CTiffContext() = default;
   ~CTiffContext() override = default;
 
-  bool InitDecoder(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<IFX_SeekableReadStream>& file_ptr);
-  bool LoadFrameInfo(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, int32_t frame,
+  bool InitDecoder(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<IFX_SeekableReadStream>& file_ptr);
+  bool LoadFrameInfo(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, int32_t frame,
                      int32_t* width,
                      int32_t* height,
                      int32_t* comps,
                      int32_t* bpc,
                      CFX_DIBAttribute* pAttribute);
-  bool Decode(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap);
+  bool Decode(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap);
 
   RetainPtr<IFX_SeekableReadStream> io_in() const { return m_io_in; }
   uint32_t offset() const { return m_offset; }
   void set_offset(uint32_t offset) { m_offset = offset; }
 
  private:
-  bool IsSupport(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap) const;
-  void SetPalette(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap, uint16_t bps);
-  bool Decode1bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap,
+  bool IsSupport(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap) const;
+  void SetPalette(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap, uint16_t bps);
+  bool Decode1bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap,
                      int32_t height,
                      int32_t width,
                      uint16_t bps,
                      uint16_t spp);
-  bool Decode8bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox,const RetainPtr<CFX_DIBitmap>& pDIBitmap,
+  bool Decode8bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox,const RetainPtr<CFX_DIBitmap>& pDIBitmap,
                      int32_t height,
                      int32_t width,
                      uint16_t bps,
                      uint16_t spp);
-  bool Decode24bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox,const RetainPtr<CFX_DIBitmap>& pDIBitmap,
+  bool Decode24bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox,const RetainPtr<CFX_DIBitmap>& pDIBitmap,
                       int32_t height,
                       int32_t width,
                       uint16_t bps,
@@ -196,9 +197,10 @@ int tiff_map(thandle_t context, tdata_t*, toff_t*) {
 
 void tiff_unmap(thandle_t context, tdata_t, toff_t) {}
 
-TIFF* tiff_open(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, void* context, const char* mode) {
+TIFF* tiff_open(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, void* context, const char* mode) {
 
   //invoke sandbox
+  /*
   const char* string = "Tiff Image";
   auto size_1= strlen(string) + 1;
   auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
@@ -224,19 +226,21 @@ TIFF* tiff_open(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, void*
    //change
    return tiff;
  });
-
-  /*TIFF* tif = TIFFClientOpen("Tiff Image", mode, (thandle_t)context, tiff_read,
+*/
+ TIFF* tif = TIFFClientOpen("Tiff Image", mode, (thandle_t)context, tiff_read,
                              tiff_write, tiff_seek, tiff_close, tiff_get_size,
                              tiff_map, tiff_unmap);
-                             */
+                             
   if (tif) {
     tif->tif_fd = (int)(intptr_t)context;
   }
   return tif;
 
+/*
   sandbox.free_in_sandbox(string_T);
   sandbox.free_in_sandbox(mode_T);
   sandbox.free_in_sandbox(context_temp);
+  */
 }
 
 void TiffBGRA2RGBA(uint8_t* pBuf, int32_t pixel, int32_t spp) {
@@ -250,23 +254,24 @@ void TiffBGRA2RGBA(uint8_t* pBuf, int32_t pixel, int32_t spp) {
 
 }  // namespace
 
-bool CTiffContext::InitDecoder(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox,
+bool CTiffContext::InitDecoder(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox,
     const RetainPtr<IFX_SeekableReadStream>& file_ptr) {
   m_io_in = file_ptr;
   m_tif_ctx.reset(tiff_open(sandbox, this, "r"));
   return !!m_tif_ctx;
 }
 
-bool CTiffContext::LoadFrameInfo(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, int32_t frame,
+bool CTiffContext::LoadFrameInfo(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, int32_t frame,
                                  int32_t* width,
                                  int32_t* height,
                                  int32_t* comps,
                                  int32_t* bpc,
                                  CFX_DIBAttribute* pAttribute) {
-  //invoke sandbox
+  //invoke sandbox testing
 
   if(!sandbox.invoke_sandbox_function(TIFFSetDirectory, s, (uint16)frame).copy_and_verify([](int ret) {
-    //change
+    //TIFFSetDirectory returns answer from TIFFReadDirectory, which should only return 0 (fail) or success (1)
+    assert(ret == 0 || ret == 1)
     return ret;
   }))
   //if (!TIFFSetDirectory(m_tif_ctx.get(), (uint16)frame))
@@ -310,21 +315,24 @@ sandbox.free_in_sandbox(tif_width_ptr);
 
   
   uint16_t tif_resunit = 0;
+  uint16_t tif_resunit_actual_ptr = &tif_resunit;
     auto tif_resunit_ptr = sandbox.malloc_in_sandbox<uint16_t>();
   *tif_resunit_ptr = &tif_resunit;
 
-  if(sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_RESOLUTIONUNIT, tif_resunit_ptr).copy_and_verify([](int ret){
-    //change
+  if(sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_RESOLUTIONUNIT, tif_resunit_ptr).copy_and_verify([tif_resunit_actual_ptr](int ret){
+   //2 valid cases: TIFFGetField returns 0 meaning field was not found,
+   // or returns the value of the tag, with tif_resunit being set to the value of the field
+   assert(ret == 0 || (ret == TIFFTAG_RESOLUTIONUNIT && (*tif_resunit_actual_ptr == RESUNIT_NONE || *tif_resunit_actual_ptr == RESUNIT_INCH || *tif_resunit_actual_ptr == RESUNIT_CENTIMETER)))
     return ret;
   })) {
-  sandbox.free_in_sandbox(tif_resunit_ptr);
+
   //if (TIFFGetField(m_tif_ctx.get(), TIFFTAG_RESOLUTIONUNIT, &tif_resunit)) {
     pAttribute->m_wDPIUnit =
         static_cast<CFX_DIBAttribute::ResUnit>(tif_resunit - 1);
   } else {
     pAttribute->m_wDPIUnit = CFX_DIBAttribute::kResUnitInch;
   }
-
+  sandbox.free_in_sandbox(tif_resunit_ptr);
   float tif_xdpi = 0.0f;
   auto tif_xdpi_ptr = sandbox.malloc_in_sandbox<float>();
   *tif_xdpi_ptr = &tif_xdpi;
@@ -364,20 +372,22 @@ sandbox.free_in_sandbox(tif_width_ptr);
   return true;
 }
 
-bool CTiffContext::IsSupport(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap) const {
+bool CTiffContext::IsSupport(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap) const {
   //invoke sandbox
-  if(sandbox.invoke_sandbox_function(TIFFIsTiled, s).copy_and_verify([](int ret){
-    //change
-    return ret;
-  }))
-  //if (TIFFIsTiled(m_tif_ctx.get()))
+  // if(sandbox.invoke_sandbox_function(TIFFIsTiled, s).copy_and_verify([](int ret){
+  //   //change
+  //   return ret;
+  // }))
+  if (TIFFIsTiled(m_tif_ctx.get()))
     return false;
 
   uint16_t photometric = 0;
+  uint16_t* photometric_ptr_real = &photometric;
   auto photometric_ptr = sandbox.malloc_in_sandbox<uint16_t>();
   *photometric_ptr = &photometric;
-    if(!sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_PHOTOMETRIC, photometric_ptr).copy_and_verify([](int ret) {
+    if(!sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_PHOTOMETRIC, photometric_ptr).copy_and_verify([photometric_ptr_real](int ret) {
       //change
+      assert(ret == 0 || (ret == TIFFTAG_PHOTOMETRIC && (*photometric_ptr_real == PHOTOMETRIC_MINISWHITE || *photometric_ptr_real == PHOTOMETRIC_MINISBLACK || *photometric_ptr_real == PHOTOMETRIC_RBG || *photometric_ptr_real == PHOTOTMETRIC_PALETTE || *photometric_ptr_real == PHOTOTMETRIC_MASK || *photometric_ptr_real == PHOTOMETRIC_SEPARATED || *photometric_ptr_real == PHOTOTMETRIC_YCBCR || *photometric_ptr_real == PHOTOTMETRIC_CIELAB || *photometric_ptr_real == PHOTOTMETRIC_ICCLAB || *photometric_ptr_real == PHOTOTMETRIC_ITULAB || *photometric_ptr_real == PHOTOTMETRIC_LOGL || *photometric_ptr_real == PHOTOTMETRIC_LOGLUV)))
       return ret;
     })) {
       sandbox.free_in_sandbox(photometric_ptr);
@@ -402,22 +412,22 @@ bool CTiffContext::IsSupport(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> s
       return false;
   }
   uint16_t planarconfig = 0;
-  auto planarconfig_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *planarconfig_ptr = &planarconfig;
-   if(!sandbox.invoke_sandbox_function(TIFFGetFieldDefaulted, s, TIFFTAG_PLANARCONFIG, planarconfig_ptr).copy_and_verify([](int ret) {
-      //change
-      return ret;
-    })) {
-  //invoke sandbox
-  //if (!TIFFGetFieldDefaulted(m_tif_ctx.get(), TIFFTAG_PLANARCONFIG,
-sandbox.free_in_sandbox(planarconfig_ptr);
+  // auto planarconfig_ptr = sandbox.malloc_in_sandbox<uint16_t>();
+  // *planarconfig_ptr = &planarconfig;
+  //  if(!sandbox.invoke_sandbox_function(TIFFGetFieldDefaulted, s, TIFFTAG_PLANARCONFIG, planarconfig_ptr).copy_and_verify([](int ret) {
+  //     //change
+  //     return ret;
+  //   })) {
+  //invoke sandbox (might be wrong)
+  if (!TIFFGetFieldDefaulted(m_tif_ctx.get(), TIFFTAG_PLANARCONFIG, &planar_config)){
+//sandbox.free_in_sandbox(planarconfig_ptr);
     return false;
     }
-  sandbox.free_in_sandbox(planarconfig_ptr);
+  //sandbox.free_in_sandbox(planarconfig_ptr);
   return planarconfig != PLANARCONFIG_SEPARATE;
 }
 
-void CTiffContext::SetPalette(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap,
+void CTiffContext::SetPalette(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap,
                               uint16_t bps) {
   uint16_t* red_orig = nullptr;
   uint16_t* green_orig = nullptr;
@@ -454,7 +464,7 @@ void CTiffContext::SetPalette(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> 
   sandbox.free_in_sandbox(blue_orig_ptr);
 }
 
-bool CTiffContext::Decode1bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap,
+bool CTiffContext::Decode1bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap,
                                  int32_t height,
                                  int32_t width,
                                  uint16_t bps,
@@ -465,40 +475,40 @@ bool CTiffContext::Decode1bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbo
   }
   SetPalette(sandbox, pDIBitmap, bps);
   //invoke sandbox
-  int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
-    //add some checks
-    return ret;
-  });
-  //int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
+  // int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
+  //   //add some checks
+  //   return ret;
+  // });
+  int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
   uint8_t* buf = (uint8_t*)_TIFFmalloc(size);
   //invoke sandbox
   if (!buf) {
      //invoke sandbox
-    auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
-      //add checks
-      return val;
-    });
-    auto ans_size = strlen(ans.get()) + 1;
-    auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
-    std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
+  //   auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
+  //     //add checks
+  //     return val;
+  //   });
+  //   auto ans_size = strlen(ans.get()) + 1;
+  //   auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
+  //   std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
     
-    const char* string =  "No space for scanline buffer";
-    auto size_1= strlen(string) + 1;
-    auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
-    std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
+  //   const char* string =  "No space for scanline buffer";
+  //   auto size_1= strlen(string) + 1;
+  //   auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
+  //   std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
 
-    sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
-  sandbox.free_in_sandbox(ans_T);
-  sandbox.free_in_sandbox(string_T);
-   // TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
+  //   sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
+  // sandbox.free_in_sandbox(ans_T);
+  // sandbox.free_in_sandbox(string_T);
+    TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
     return false;
   }
-  rlbox::tainted<uint8_t*, rlbox::rlbox_wasm2c_sandbox> buf_T = buf;
+ // rlbox::tainted<uint8_t*, rlbox::rlbox_wasm2c_sandbox> buf_T = buf;
   for (int32_t row = 0; row < height; row++) {
     uint8_t* bitMapbuffer = pDIBitmap->GetWritableScanline(row).data();
     //invoke sandbox
-    sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
-    //TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
+    //sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
+    TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
     for (int32_t j = 0; j < size; j++) {
       bitMapbuffer[j] = buf[j];
     }
@@ -509,7 +519,7 @@ bool CTiffContext::Decode1bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbo
   return true;
 }
 
-bool CTiffContext::Decode8bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap,
+bool CTiffContext::Decode8bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap,
                                  int32_t height,
                                  int32_t width,
                                  uint16_t bps,
@@ -520,39 +530,39 @@ bool CTiffContext::Decode8bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbo
   }
   SetPalette(sandbox, pDIBitmap, bps);
   //invoke sandbox
-  int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
-    //add some checks
-    return ret;
-  });
-  //int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
+  // int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
+  //   //add some checks
+  //   return ret;
+  // });
+  int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
   uint8_t* buf = (uint8_t*)_TIFFmalloc(size);
   if (!buf) {
    //invoke sandbox
-    auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
-      //add checks
-      return val;
-    });
-    auto ans_size = strlen(ans.get()) + 1;
-    auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
-    std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
+  //   auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
+  //     //add checks
+  //     return val;
+  //   });
+  //   auto ans_size = strlen(ans.get()) + 1;
+  //   auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
+  //   std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
 
-    const char* string =  "No space for scanline buffer";
-    auto size_1= strlen(string) + 1;
-    auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
-    std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
+  //   const char* string =  "No space for scanline buffer";
+  //   auto size_1= strlen(string) + 1;
+  //   auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
+  //   std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
 
-    sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
-      sandbox.free_in_sandbox(ans_T);
-  sandbox.free_in_sandbox(string_T);
-    //TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
+  //   sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
+  //     sandbox.free_in_sandbox(ans_T);
+  // sandbox.free_in_sandbox(string_T);
+    TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
     return false;
   }
-  rlbox::tainted<uint8_t*, rlbox::rlbox_wasm2c_sandbox> buf_T = buf;
+  //rlbox::tainted<uint8_t*, rlbox::rlbox_wasm2c_sandbox> buf_T = buf;
   for (int32_t row = 0; row < height; row++) {
     uint8_t* bitMapbuffer = pDIBitmap->GetWritableScanline(row).data();
     //invoke sandbox
-    sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
-    //TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
+    //sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
+    TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
     for (int32_t j = 0; j < size; j++) {
       switch (bps) {
         case 4:
@@ -570,7 +580,7 @@ bool CTiffContext::Decode8bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbo
   return true;
 }
 
-bool CTiffContext::Decode24bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox,const RetainPtr<CFX_DIBitmap>& pDIBitmap,
+bool CTiffContext::Decode24bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox,const RetainPtr<CFX_DIBitmap>& pDIBitmap,
                                   int32_t height,
                                   int32_t width,
                                   uint16_t bps,
@@ -578,39 +588,39 @@ bool CTiffContext::Decode24bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandb
   if (pDIBitmap->GetBPP() != 24 || !IsSupport(sandbox, pDIBitmap))
     return false;
   //invoke sandbox
-  int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
-    //add some checks
-    return ret;
-  });
-  //int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
+  // int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
+  //   //add some checks
+  //   return ret;
+  // });
+  int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
   uint8_t* buf = (uint8_t*)_TIFFmalloc(size);
   if (!buf) {
     //invoke sandbox
-    auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
-      //add checks
-      return val;
-    });
-    auto ans_size = strlen(ans.get()) + 1;
-    auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
-    std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
+  //   auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
+  //     //add checks
+  //     return val;
+  //   });
+  //   auto ans_size = strlen(ans.get()) + 1;
+  //   auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
+  //   std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
 
-    const char* string =  "No space for scanline buffer";
-    auto size_1= strlen(string) + 1;
-    auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
-    std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
+  //   const char* string =  "No space for scanline buffer";
+  //   auto size_1= strlen(string) + 1;
+  //   auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
+  //   std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
 
-    sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
-    //TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
-      sandbox.free_in_sandbox(ans_T);
-  sandbox.free_in_sandbox(string_T);  
+  //   sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
+  TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
+  //     sandbox.free_in_sandbox(ans_T);
+  // sandbox.free_in_sandbox(string_T);  
     return false;
   }
-  rlbox::tainted<uint8_t*, rlbox::rlbox_wasm2c_sandbox> buf_T = buf;
+ // rlbox::tainted<uint8_t*, rlbox::rlbox_wasm2c_sandbox> buf_T = buf;
   for (int32_t row = 0; row < height; row++) {
     uint8_t* bitMapbuffer = pDIBitmap->GetWritableScanline(row).data();
     //invoke sandbox
-    sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
-  //  TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
+   // sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
+    TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
     for (int32_t j = 0; j < size - 2; j += 3) {
       bitMapbuffer[j + 0] = buf[j + 2];
       bitMapbuffer[j + 1] = buf[j + 1];
@@ -622,7 +632,7 @@ bool CTiffContext::Decode24bppRGB(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandb
   return true;
 }
 
-bool CTiffContext::Decode(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap) {
+bool CTiffContext::Decode(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap) {
   uint32_t img_width = pDIBitmap->GetWidth();
   uint32_t img_height = pDIBitmap->GetHeight();
   uint32_t width = 0;
@@ -651,22 +661,22 @@ bool CTiffContext::Decode(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sand
     //TIFFGetField(m_tif_ctx.get(), TIFFTAG_ORIENTATION, &rotation);
     //invoke sandbox
   uint32* temp = (uint32*)pDIBitmap->GetBuffer();
-  auto temp_T= sandbox.malloc_in_sandbox<uint32_t>(sizeof(temp));
-  rlbox::memcpy(sandbox, temp_T, temp, sizeof(temp));
+//   auto temp_T= sandbox.malloc_in_sandbox<uint32_t>(sizeof(temp));
+//   rlbox::memcpy(sandbox, temp_T, temp, sizeof(temp));
 
- if(sandbox.invoke_sandbox_function(TIFFReadRGBAImageOriented, s, img_width, img_height, temp_T, rotation, 1).copy_and_verify([](int ret){
-   //change
-   return ret;
- })) {
-  //  if (TIFFReadRGBAImageOriented(m_tif_ctx.get(), img_width, img_height,
-                              //    (uint32*)pDIBitmap->GetBuffer(), rotation,
-                             //     1)) {
+//  if(sandbox.invoke_sandbox_function(TIFFReadRGBAImageOriented, s, img_width, img_height, temp_T, rotation, 1).copy_and_verify([](int ret){
+//    //change
+//    return ret;
+//  })) {
+  if (TIFFReadRGBAImageOriented(m_tif_ctx.get(), img_width, img_height,
+                               (uint32*)pDIBitmap->GetBuffer(), rotation,
+                                1)) {
       for (uint32_t row = 0; row < img_height; row++) {
         uint8_t* row_buf = pDIBitmap->GetWritableScanline(row).data();
         TiffBGRA2RGBA(row_buf, img_width, 4);
       }
 sandbox.free_in_sandbox(rotation_ptr);
-sandbox.free_in_sandbox(temp_T);
+//sandbox.free_in_sandbox(temp_T);
       return true;
     }
   }
@@ -701,7 +711,7 @@ sandbox.free_in_sandbox(temp_T);
 namespace fxcodec {
 
 // static
-std::unique_ptr<ProgressiveDecoderIface::Context> TiffDecoder::CreateDecoder(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox,
+std::unique_ptr<ProgressiveDecoderIface::Context> TiffDecoder::CreateDecoder(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox,
     const RetainPtr<IFX_SeekableReadStream>& file_ptr) {
   auto pDecoder = std::make_unique<CTiffContext>();
   if (!pDecoder->InitDecoder(sandbox, file_ptr))
@@ -711,7 +721,7 @@ std::unique_ptr<ProgressiveDecoderIface::Context> TiffDecoder::CreateDecoder(rlb
 }
 
 // static
-bool TiffDecoder::LoadFrameInfo(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, ProgressiveDecoderIface::Context* pContext,
+bool TiffDecoder::LoadFrameInfo(rlbox::rlbox_sandbox<rlbox_noop_sandbox>  sandbox, ProgressiveDecoderIface::Context* pContext,
                                 int32_t frame,
                                 int32_t* width,
                                 int32_t* height,
@@ -725,7 +735,7 @@ bool TiffDecoder::LoadFrameInfo(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox
 }
 
 // static
-bool TiffDecoder::Decode(rlbox::rlbox_sandbox<rlbox::rlbox_wasm2c_sandbox> sandbox, ProgressiveDecoderIface::Context* pContext,
+bool TiffDecoder::Decode(rlbox::rlbox_sandbox<rlbox_noop_sandbox>  sandbox, ProgressiveDecoderIface::Context* pContext,
                          const RetainPtr<CFX_DIBitmap>& pDIBitmap) {
   auto* ctx = static_cast<CTiffContext*>(pContext);
   return ctx->Decode(sandbox, pDIBitmap);

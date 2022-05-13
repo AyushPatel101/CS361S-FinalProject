@@ -37,8 +37,10 @@
 #ifdef PDF_ENABLE_XFA_TIFF
 #include "core/fxcodec/tiff/tiff_decoder.h"
 #define RLBOX_SINGLE_THREADED_INVOCATIONS
-#include "rlbox_wasm2c_sandbox.hpp"
+#define RLBOX_USEstatic_CALLS() rlbox_noop_sandbox_lookup_symbol
+#include "rlbox_noop_sandbox.hpp"
 #include "rlbox.hpp"
+using namespace rlbox;
 #endif  // PDF_ENABLE_XFA_TIFF
 
 
@@ -1253,7 +1255,7 @@ bool ProgressiveDecoder::TiffDetectImageTypeFromFile(
     CFX_DIBAttribute* pAttribute) {
 
   //change
-  sandbox.create_sandbox("./my_lib.so");
+  sandbox.create_sandbox();
 
   m_pTiffContext = TiffDecoder::CreateDecoder(sandbox, m_pFile);
   if (!m_pTiffContext) {

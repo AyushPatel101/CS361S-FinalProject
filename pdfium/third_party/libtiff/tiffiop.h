@@ -150,7 +150,7 @@ struct tiff {
 	uint16               tif_dirnumber;    /* number of already seen directories */
 	TIFFDirectory        tif_dir;          /* internal rep of current directory */
 	TIFFDirectory        tif_customdir;    /* custom IFDs are separated from the main ones */
-	union {
+	dunion {
 		TIFFHeaderCommon common;
 		TIFFHeaderClassic classic;
 		TIFFHeaderBig big;
