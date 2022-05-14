@@ -1,4 +1,4 @@
-## Files modified:
+### Files modified:
 Main sandboxing is done in: pdfium/core/fxcodec/tiff/tiff_decoder.h, tiff_decoder.c <br>
 Sandbox is created and destroyed in:pdfium/core/fxcodec/progressive_decoder.cpp<br>
 Sandbox declared in: pdfium/core/fxcodec/progressive_decoder.h<br>
