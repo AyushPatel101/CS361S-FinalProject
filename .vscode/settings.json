@@ -107,6 +107,8 @@
         "*.ipp": "cpp",
         "__assert": "cpp",
         "*.inc": "cpp",
-        "metal_types": "cpp"
-    }
+        "metal_types": "cpp",
+        "osmemory": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
 }

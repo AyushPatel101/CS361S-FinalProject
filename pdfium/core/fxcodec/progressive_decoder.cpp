@@ -1249,7 +1249,7 @@ FXCODEC_STATUS ProgressiveDecoder::PngContinueDecode() {
 }
 #endif  // PDF_ENABLE_XFA_PNG
 
-#ifdef PDF_ENABLE_XFA_TIFF
+//#ifdef PDF_ENABLE_XFA_TIFF
 //sandbox
 bool ProgressiveDecoder::TiffDetectImageTypeFromFile(
     CFX_DIBAttribute* pAttribute) {

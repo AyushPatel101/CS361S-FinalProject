@@ -200,7 +200,6 @@ void tiff_unmap(thandle_t context, tdata_t, toff_t) {}
 TIFF* tiff_open(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, void* context, const char* mode) {
 
   //invoke sandbox
-  /*
   const char* string = "Tiff Image";
   auto size_1= strlen(string) + 1;
   auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
@@ -210,9 +209,7 @@ TIFF* tiff_open(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, void* context,
   auto mode_T = sandbox.malloc_in_sandbox<char>(size_2);
   std::strncpy(mode_T.unverified_safe_pointer_because(size_2, "writing to memory"), mode, size_2);
 
-  auto context_temp= sandbox.malloc_in_sandbox<void>(sizeof(void*));
-  rlbox::memcpy(sandbox, context_temp, context, sizeof(void*));
-  auto context_T = rlbox::sandbox_reinterpret_cast<thandle_t>(context_temp);
+
 
   auto tiff_read_T = sandbox.get_sandbox_function_address(tiff_read);
   auto tiff_write_T = sandbox.get_sandbox_function_address(tiff_write);
@@ -220,27 +217,29 @@ TIFF* tiff_open(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, void* context,
   auto tiff_close_T = sandbox.get_sandbox_function_address(tiff_close);
   auto tiff_get_size_T = sandbox.get_sandbox_function_address(tiff_get_size);
   auto tiff_map_T = sandbox.get_sandbox_function_address(tiff_map);
-  auto tiff_unmap_T = sandbox.get_sandbox_function_address(tiff_unmap);
 
+ auto tiff_unmap_T = sandbox.get_sandbox_function_address(tiff_unmap);
  TIFF* tif = sandbox.invoke_sandbox_function(TIFFClientOpen, string_T, mode_T, context_T, tiff_read_T, tiff_write_T, tiff_seek_T, tiff_close_T, tiff_get_size_T, tiff_map_T, tiff_unmap_T).copy_and_verify([](TIFF* tiff) {
-   //change
+   assert(tiff!=nullptr)
    return tiff;
  });
-*/
- TIFF* tif = TIFFClientOpen("Tiff Image", mode, (thandle_t)context, tiff_read,
-                             tiff_write, tiff_seek, tiff_close, tiff_get_size,
-                             tiff_map, tiff_unmap);
+
+  auto context_temp= sandbox.malloc_in_sandbox<void>(sizeof(void*));
+  rlbox::memcpy(sandbox, context_temp, context, sizeof(void*));
+  auto context_T = rlbox::sandbox_reinterpret_cast<thandle_t>(context_temp);
+ //TIFF* tif = TIFFClientOpen("Tiff Image", mode, (thandle_t)context, tiff_read,
+                       //      tiff_write, tiff_seek, tiff_close, tiff_get_size,
+                        //     tiff_map, tiff_unmap);
                              
   if (tif) {
     tif->tif_fd = (int)(intptr_t)context;
   }
   return tif;
 
-/*
+
   sandbox.free_in_sandbox(string_T);
   sandbox.free_in_sandbox(mode_T);
   sandbox.free_in_sandbox(context_temp);
-  */
 }
 
 void TiffBGRA2RGBA(uint8_t* pBuf, int32_t pixel, int32_t spp) {
@@ -268,14 +267,21 @@ bool CTiffContext::LoadFrameInfo(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbo
                                  int32_t* bpc,
                                  CFX_DIBAttribute* pAttribute) {
   //invoke sandbox testing
+  size_t size = sizeof(*m_tif_ctx.get());
+  auto s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), 
+  m_tif_ctx.get(), size);
 
   if(!sandbox.invoke_sandbox_function(TIFFSetDirectory, s, (uint16)frame).copy_and_verify([](int ret) {
     //TIFFSetDirectory returns answer from TIFFReadDirectory, which should only return 0 (fail) or success (1)
     assert(ret == 0 || ret == 1)
     return ret;
   }))
-  //if (!TIFFSetDirectory(m_tif_ctx.get(), (uint16)frame))
-    return false;
+  auto s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote to this pointer, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
+  // if (!TIFFSetDirectory(m_tif_ctx.get(), (uint16)frame))
+    // return false;
 
   uint32_t tif_width = 0;
   uint32_t tif_height = 0;
@@ -284,22 +290,57 @@ bool CTiffContext::LoadFrameInfo(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbo
   uint32_t tif_rps = 0;
 
   auto tif_width_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *tif_width_ptr = &tif_width;
   auto tif_height_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *tif_height_ptr = &tif_height;
   auto tif_comps_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *tif_comps_ptr = &tif_comps;
   auto tif_bpc_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *tif_bpc_ptr = &tif_bpc;
   auto tif_rps_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *tif_rps_ptr = &tif_rps;
   //invoke sandbox
+  
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s,  TIFFTAG_IMAGEWIDTH, tif_width_ptr);
+  tif_width = *tif_width_ptr;
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
+
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_IMAGELENGTH, tif_height_ptr);
+  tif_height = *tif_height_ptr;
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
+
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_SAMPLESPERPIXEL, tif_comps_ptr);
+  tif_comps = *tif_comps_ptr;
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
+
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_BITSPERSAMPLE, tif_bpc_ptr);
+  tif_bpc = *tif_bpc_ptr;
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
+
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_ROWSPERSTRIP, tif_rps_ptr);
-     /*
+  tif_rps = *tif_rps_ptr;
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
+    /*
   TIFFGetField(m_tif_ctx.get(), TIFFTAG_IMAGEWIDTH, &tif_width);
   TIFFGetField(m_tif_ctx.get(), TIFFTAG_IMAGELENGTH, &tif_height);
   TIFFGetField(m_tif_ctx.get(), TIFFTAG_SAMPLESPERPIXEL, &tif_comps);
@@ -307,27 +348,35 @@ bool CTiffContext::LoadFrameInfo(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbo
   TIFFGetField(m_tif_ctx.get(), TIFFTAG_ROWSPERSTRIP, &tif_rps);
 */
 //invoke sandbox
-sandbox.free_in_sandbox(tif_width_ptr);
+  sandbox.free_in_sandbox(tif_width_ptr);
   sandbox.free_in_sandbox(tif_height_ptr);
   sandbox.free_in_sandbox(tif_comps_ptr);
   sandbox.free_in_sandbox(tif_bpc_ptr);
   
 
   
-  uint16_t tif_resunit = 0;
-  uint16_t tif_resunit_actual_ptr = &tif_resunit;
-    auto tif_resunit_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *tif_resunit_ptr = &tif_resunit;
+  
 
-  if(sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_RESOLUTIONUNIT, tif_resunit_ptr).copy_and_verify([tif_resunit_actual_ptr](int ret){
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
+
+  uint16_t tif_resunit = 0;
+  auto tif_resunit_ptr = sandbox.malloc_in_sandbox<uint16_t>();
+  auto bool1 = sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_RESOLUTIONUNIT, tif_resunit_ptr).copy_and_verify([tif_resunit_ptr](int ret){
    //2 valid cases: TIFFGetField returns 0 meaning field was not found,
    // or returns the value of the tag, with tif_resunit being set to the value of the field
-   assert(ret == 0 || (ret == TIFFTAG_RESOLUTIONUNIT && (*tif_resunit_actual_ptr == RESUNIT_NONE || *tif_resunit_actual_ptr == RESUNIT_INCH || *tif_resunit_actual_ptr == RESUNIT_CENTIMETER)))
+   assert(ret == 0 || (ret == TIFFTAG_RESOLUTIONUNIT && (*tif_resunit_ptr == RESUNIT_NONE || *tif_resunit_ptr == RESUNIT_INCH || *tif_resunit_ptr == RESUNIT_CENTIMETER)))
     return ret;
-  })) {
-
+  });
+  //auto bool1 = (TIFFGetField(m_tif_ctx.get(), TIFFTAG_RESOLUTIONUNIT, &tif_resunit))
+  tif_resunit = *tif_resunit_ptr
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
+  if(bool1) {
+  
   //if (TIFFGetField(m_tif_ctx.get(), TIFFTAG_RESOLUTIONUNIT, &tif_resunit)) {
-    pAttribute->m_wDPIUnit =
+     pAttribute->m_wDPIUnit =
         static_cast<CFX_DIBAttribute::ResUnit>(tif_resunit - 1);
   } else {
     pAttribute->m_wDPIUnit = CFX_DIBAttribute::kResUnitInch;
@@ -335,21 +384,35 @@ sandbox.free_in_sandbox(tif_width_ptr);
   sandbox.free_in_sandbox(tif_resunit_ptr);
   float tif_xdpi = 0.0f;
   auto tif_xdpi_ptr = sandbox.malloc_in_sandbox<float>();
-  *tif_xdpi_ptr = &tif_xdpi;
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_XRESOLUTION, tif_xdpi_ptr);
+  tif_xpdi = *tif_xpdi_ptr;
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
   //invoke sandbox
- // TIFFGetField(m_tif_ctx.get(), TIFFTAG_XRESOLUTION, &tif_xdpi);
-  if (tif_xdpi)
+ // TIFFGetField(m_tif_ctx.get(), TIFFTAG_XRESOLUTION, &tif_xdp
+
+  if (tif_xdpi)// 
     pAttribute->m_nXDPI = static_cast<int32_t>(tif_xdpi + 0.5f);
   sandbox.free_in_sandbox(tif_xdpi_ptr);
+
   float tif_ydpi = 0.0f;
-   auto tif_ydpi_ptr = sandbox.malloc_in_sandbox<float>();
-  *tif_ydpi_ptr = &tif_ydpi;
-    sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_YRESOLUTION, tif_ydpi_ptr);
+  auto tif_ydpi_ptr = sandbox.malloc_in_sandbox<float>();
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
+  sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_YRESOLUTION, tif_ydpi_ptr);
+  tif_ypdi = *tif_ypdi_ptr;
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
   //invoke sandbox
   //TIFFGetField(m_tif_ctx.get(), TIFFTAG_YRESOLUTION, &tif_ydpi);
   if (tif_ydpi)
     pAttribute->m_nYDPI = static_cast<int32_t>(tif_ydpi + 0.5f);
+
   sandbox.free_in_sandbox(tif_ydpi_ptr);
   FX_SAFE_INT32 checked_width = tif_width;
   FX_SAFE_INT32 checked_height = tif_height;
@@ -362,9 +425,16 @@ sandbox.free_in_sandbox(tif_width_ptr);
   *comps = tif_comps;
   *bpc = tif_bpc;
   if (tif_rps > tif_height) {
-    tif_rps = tif_height;
+      tif_rps = tif_height;
     //invoke sandbox
+    size = sizeof(*m_tif_ctx.get());
+    s = sandbox.malloc_in_sandbox<Tiff>(size);
+    rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
     sandbox.invoke_sandbox_function(TIFFSetField, s, TIFFTAG_ROWSPERSTRIP, tif_rps_ptr);
+    tif_rps = *tif_rps_ptr;
+    s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+    m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+    sandbox.free_in_sandbox(s);
  //   TIFFSetField(m_tif_ctx.get(), TIFFTAG_ROWSPERSTRIP, tif_rps);
   }
   
@@ -374,27 +444,41 @@ sandbox.free_in_sandbox(tif_width_ptr);
 
 bool CTiffContext::IsSupport(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap) const {
   //invoke sandbox
-  // if(sandbox.invoke_sandbox_function(TIFFIsTiled, s).copy_and_verify([](int ret){
-  //   //change
-  //   return ret;
-  // }))
-  if (TIFFIsTiled(m_tif_ctx.get()))
+  auto size = sizeof(*m_tif_ctx.get());
+  auto s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
+  auto bool1 = sandbox.invoke_sandbox_function(TIFFIsTiled, s).copy_and_verify([](int ret){
+    //change
+    return ret;
+  });
+   auto s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+    m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+    sandbox.free_in_sandbox(s);
+  if(bool1)
+//  if (TIFFIsTiled(m_tif_ctx.get()))
     return false;
 
   uint16_t photometric = 0;
-  uint16_t* photometric_ptr_real = &photometric;
   auto photometric_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *photometric_ptr = &photometric;
-    if(!sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_PHOTOMETRIC, photometric_ptr).copy_and_verify([photometric_ptr_real](int ret) {
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
+  auto booe = sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_PHOTOMETRIC, photometric_ptr).copy_and_verify([photometric_ptr](int ret) {
       //change
-      assert(ret == 0 || (ret == TIFFTAG_PHOTOMETRIC && (*photometric_ptr_real == PHOTOMETRIC_MINISWHITE || *photometric_ptr_real == PHOTOMETRIC_MINISBLACK || *photometric_ptr_real == PHOTOMETRIC_RBG || *photometric_ptr_real == PHOTOTMETRIC_PALETTE || *photometric_ptr_real == PHOTOTMETRIC_MASK || *photometric_ptr_real == PHOTOMETRIC_SEPARATED || *photometric_ptr_real == PHOTOTMETRIC_YCBCR || *photometric_ptr_real == PHOTOTMETRIC_CIELAB || *photometric_ptr_real == PHOTOTMETRIC_ICCLAB || *photometric_ptr_real == PHOTOTMETRIC_ITULAB || *photometric_ptr_real == PHOTOTMETRIC_LOGL || *photometric_ptr_real == PHOTOTMETRIC_LOGLUV)))
+      assert(ret == 0 || (ret == TIFFTAG_PHOTOMETRIC && (*photometric_ptr== PHOTOMETRIC_MINISWHITE || *photometric_ptr == PHOTOMETRIC_MINISBLACK || *photometric_ptr == PHOTOMETRIC_RBG || *photometric_ptr == PHOTOTMETRIC_PALETTE || *photometric_ptr == PHOTOTMETRIC_MASK || *photometric_ptr == PHOTOMETRIC_SEPARATED || *photometric_ptr == PHOTOTMETRIC_YCBCR || *photometric_ptr == PHOTOTMETRIC_CIELAB || *photometric_ptr== PHOTOTMETRIC_ICCLAB || *photometric_ptr == PHOTOTMETRIC_ITULAB || *photometric_ptr == PHOTOTMETRIC_LOGL || *photometric_ptr == PHOTOTMETRIC_LOGLUV)));
       return ret;
-    })) {
-      sandbox.free_in_sandbox(photometric_ptr);
+    });
+     s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+      m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+      sandbox.free_in_sandbox(s);
+          
   //invoke sandbox
   //if (!TIFFGetField(m_tif_ctx.get(), TIFFTAG_PHOTOMETRIC, &photometric))
+    if(!booe) {
+      sandbox.free_in_sandbox(photometric_ptr);
     return false;
     }
+    photometric = *photometric_ptr;
     sandbox.free_in_sandbox(photometric_ptr);
   switch (pDIBitmap->GetBPP()) {
     case 1:
@@ -412,18 +496,26 @@ bool CTiffContext::IsSupport(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, c
       return false;
   }
   uint16_t planarconfig = 0;
-  // auto planarconfig_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  // *planarconfig_ptr = &planarconfig;
-  //  if(!sandbox.invoke_sandbox_function(TIFFGetFieldDefaulted, s, TIFFTAG_PLANARCONFIG, planarconfig_ptr).copy_and_verify([](int ret) {
-  //     //change
-  //     return ret;
-  //   })) {
+  auto planarconfig_ptr = sandbox.malloc_in_sandbox<uint16_t>();
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
+  auto boo2 = sandbox.invoke_sandbox_function(TIFFGetFieldDefaulted, s, TIFFTAG_PLANARCONFIG, planarconfig_ptr).copy_and_verify([](int ret) {
+      //change
+      return ret;
+    });
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+    m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+    sandbox.free_in_sandbox(s);
+  planarconfig = *planarconfig_ptr;
+   sandbox.free_in_sandbox(planarconfig_ptr);
+   if(!boo2) {
   //invoke sandbox (might be wrong)
-  if (!TIFFGetFieldDefaulted(m_tif_ctx.get(), TIFFTAG_PLANARCONFIG, &planar_config)){
-//sandbox.free_in_sandbox(planarconfig_ptr);
+  //if (!TIFFGetFieldDefaulted(m_tif_ctx.get(), TIFFTAG_PLANARCONFIG, &//planar_config)){
+   
     return false;
     }
-  //sandbox.free_in_sandbox(planarconfig_ptr);
+  
   return planarconfig != PLANARCONFIG_SEPARATE;
 }
 
@@ -433,12 +525,21 @@ void CTiffContext::SetPalette(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, 
   uint16_t* green_orig = nullptr;
   uint16_t* blue_orig = nullptr;
   auto red_orig_ptr = sandbox.malloc_in_sandbox<uint16_t*>();
-  *red_orig_ptr = &red_orig;
-   auto green_orig_ptr = sandbox.malloc_in_sandbox<uint16_t*>();
-  *green_orig_ptr = &green_orig;
-   auto blue_orig_ptr = sandbox.malloc_in_sandbox<uint16_t*>();
-  *blue_orig_ptr = &blue_orig;
+  auto green_orig_ptr = sandbox.malloc_in_sandbox<uint16_t*>();
+  auto blue_orig_ptr = sandbox.malloc_in_sandbox<uint16_t*>();
+  auto size = sizeof(*m_tif_ctx.get());
+  auto s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_COLORMAP, red_orig_ptr, green_orig_ptr, blue_orig_ptr);
+  
+  int32_t len = 1 << bps;
+  red_orig = *red_orig_ptr;
+  green_orig = *green_orig_ptr;
+  blue_orig = *blue_orig_ptr;
+
+  auto s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+   sandbox.free_in_sandbox(s);
   //invoke sandbox
   //TIFFGetField(m_tif_ctx.get(), TIFFTAG_COLORMAP, &red_orig, &green_orig,
        //        &blue_orig);
@@ -450,7 +551,7 @@ void CTiffContext::SetPalette(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, 
     blue_orig[i] = CVT(blue_orig[i]);
 #undef CVT
   }
-  int32_t len = 1 << bps;
+  
   for (int32_t index = 0; index < len; index++) {
     uint32_t r = red_orig[index] & 0xFF;
     uint32_t g = green_orig[index] & 0xFF;
@@ -475,40 +576,61 @@ bool CTiffContext::Decode1bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbo
   }
   SetPalette(sandbox, pDIBitmap, bps);
   //invoke sandbox
-  // int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
-  //   //add some checks
-  //   return ret;
-  // });
-  int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
+  auto size2 = sizeof(*m_tif_ctx.get());
+  auto s = sandbox.malloc_in_sandbox<Tiff>(size2);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size2, "writing to memory"), m_tif_ctx.get(), size2);
+  int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
+    //cannot read in a negative amount of lines
+    assert(ret >= 0)
+    return ret;
+  });
+  auto s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp))
+  sandbox.free_in_sandbox(s);
+  //int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
   uint8_t* buf = (uint8_t*)_TIFFmalloc(size);
   //invoke sandbox
   if (!buf) {
-     //invoke sandbox
-  //   auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
-  //     //add checks
-  //     return val;
-  //   });
-  //   auto ans_size = strlen(ans.get()) + 1;
-  //   auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
-  //   std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
-    
-  //   const char* string =  "No space for scanline buffer";
-  //   auto size_1= strlen(string) + 1;
-  //   auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
-  //   std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
+    // invoke sandbox
+    size2 = sizeof(*m_tif_ctx.get());
+    s = sandbox.malloc_in_sandbox<Tiff>(size2);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size2, "writing to memory"), m_tif_ctx.get(), size2);
+    auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
+      //file name cannot be null at this point
+      assert(val != nullptr)
+      return val;
+    });
+       s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp))
+  sandbox.free_in_sandbox(s);
 
-  //   sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
-  // sandbox.free_in_sandbox(ans_T);
-  // sandbox.free_in_sandbox(string_T);
-    TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
+    auto ans_size = strlen(ans.get()) + 1;
+    auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
+    std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
+    
+    const char* string =  "No space for scanline buffer";
+    auto size_1= strlen(string) + 1;
+    auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
+    std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
+
+    sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
+  sandbox.free_in_sandbox(ans_T);
+  sandbox.free_in_sandbox(string_T);
+   // TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
     return false;
   }
  // rlbox::tainted<uint8_t*, rlbox::rlbox_wasm2c_sandbox> buf_T = buf;
   for (int32_t row = 0; row < height; row++) {
     uint8_t* bitMapbuffer = pDIBitmap->GetWritableScanline(row).data();
     //invoke sandbox
-    //sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
-    TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
+    size2 = sizeof(*m_tif_ctx.get());
+    s = sandbox.malloc_in_sandbox<Tiff>(size2);
+    rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size2, "writing to memory"), m_tif_ctx.get(), size2);
+    sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
+    s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+    m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp))
+    sandbox.free_in_sandbox(s);
+    //TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
     for (int32_t j = 0; j < size; j++) {
       bitMapbuffer[j] = buf[j];
     }
@@ -529,40 +651,61 @@ bool CTiffContext::Decode8bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbo
     return false;
   }
   SetPalette(sandbox, pDIBitmap, bps);
-  //invoke sandbox
-  // int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
-  //   //add some checks
-  //   return ret;
-  // });
-  int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
+ //invoke sandbox
+  auto size2 = sizeof(*m_tif_ctx.get());
+  auto s = sandbox.malloc_in_sandbox<Tiff>(size2);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size2, "writing to memory"), m_tif_ctx.get(), size2);
+  int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
+    //cannot read - amount of lines
+    assert(ret >= 0)
+    return ret;
+  });
+  auto s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp))
+  sandbox.free_in_sandbox(s);
+  //int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
   uint8_t* buf = (uint8_t*)_TIFFmalloc(size);
   if (!buf) {
-   //invoke sandbox
-  //   auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
-  //     //add checks
-  //     return val;
-  //   });
-  //   auto ans_size = strlen(ans.get()) + 1;
-  //   auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
-  //   std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
+   size2 = sizeof(*m_tif_ctx.get());
+    s = sandbox.malloc_in_sandbox<Tiff>(size2);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size2, "writing to memory"), m_tif_ctx.get(), size2);
+    auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
+      //at this point, name of file cannot be null 
+      assert(val != nullptr)
+      return val;
+    });
+       s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp))
+  sandbox.free_in_sandbox(s);
 
-  //   const char* string =  "No space for scanline buffer";
-  //   auto size_1= strlen(string) + 1;
-  //   auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
-  //   std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
+    auto ans_size = strlen(ans.get()) + 1;
+    auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
+    std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
+    
+    const char* string =  "No space for scanline buffer";
+    auto size_1= strlen(string) + 1;
+    auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
+    std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
 
-  //   sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
-  //     sandbox.free_in_sandbox(ans_T);
-  // sandbox.free_in_sandbox(string_T);
-    TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
+    sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
+  sandbox.free_in_sandbox(ans_T);
+  sandbox.free_in_sandbox(string_T);
+    //TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
     return false;
   }
   //rlbox::tainted<uint8_t*, rlbox::rlbox_wasm2c_sandbox> buf_T = buf;
   for (int32_t row = 0; row < height; row++) {
     uint8_t* bitMapbuffer = pDIBitmap->GetWritableScanline(row).data();
     //invoke sandbox
+        size2 = sizeof(*m_tif_ctx.get());
+    s = sandbox.malloc_in_sandbox<Tiff>(size2);
+    rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size2, "writing to memory"), m_tif_ctx.get(), size2);
     //sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
-    TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
+    s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+    m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp))
+    sandbox.free_in_sandbox(s);
+    
+    //TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
     for (int32_t j = 0; j < size; j++) {
       switch (bps) {
         case 4:
@@ -588,39 +731,60 @@ bool CTiffContext::Decode24bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandb
   if (pDIBitmap->GetBPP() != 24 || !IsSupport(sandbox, pDIBitmap))
     return false;
   //invoke sandbox
-  // int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
-  //   //add some checks
-  //   return ret;
-  // });
-  int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
+  auto size2 = sizeof(*m_tif_ctx.get());
+  auto s = sandbox.malloc_in_sandbox<Tiff>(size2);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size2, "writing to memory"), m_tif_ctx.get(), size2);
+  int32_t size = static_cast<int32_t>sandbox.invoke_sandbox_function(TIFFScanlineSize, s).copy_and_verify([](tmsize_t ret) {
+    //cannot read in a negative amount of lines
+    assert(ret >= 0)
+    return ret;
+  });
+  auto s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp))
+  sandbox.free_in_sandbox(s);
+ // int32_t size = static_cast<int32_t>(TIFFScanlineSize(m_tif_ctx.get()));
   uint8_t* buf = (uint8_t*)_TIFFmalloc(size);
   if (!buf) {
-    //invoke sandbox
-  //   auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
-  //     //add checks
-  //     return val;
-  //   });
-  //   auto ans_size = strlen(ans.get()) + 1;
-  //   auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
-  //   std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
+   size2 = sizeof(*m_tif_ctx.get());
+    s = sandbox.malloc_in_sandbox<Tiff>(size2);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size2, "writing to memory"), m_tif_ctx.get(), size2);
+    auto ans = sandbox.invoke_sandbox_function(TIFFFileName, s).copy_and_verify_string([](std::unique_ptr<char[]> val) {
+      //file name cannot be null at this point
+    assert(val != nullptr)
+      return val;
+    });
+       s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp))
+  sandbox.free_in_sandbox(s);
 
-  //   const char* string =  "No space for scanline buffer";
-  //   auto size_1= strlen(string) + 1;
-  //   auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
-  //   std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
+    auto ans_size = strlen(ans.get()) + 1;
+    auto ans_T = sandbox.malloc_in_sandbox<char>(ans_size);
+    std::strncpy(ans_T.unverified_safe_pointer_because(ans_size, "writing to memory"), ans.get(), ans_size);
+    
+    const char* string =  "No space for scanline buffer";
+    auto size_1= strlen(string) + 1;
+    auto string_T = sandbox.malloc_in_sandbox<char>(size_1);
+    std::strncpy(string_T.unverified_safe_pointer_because(size_1, "writing to memory"), string, size_1);
 
-  //   sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
-  TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");
-  //     sandbox.free_in_sandbox(ans_T);
-  // sandbox.free_in_sandbox(string_T);  
+    sandbox.invoke_sandbox_function(TIFFError, ans_T, string_T);
+  sandbox.free_in_sandbox(ans_T);
+  sandbox.free_in_sandbox(string_T);
+ // TIFFError(TIFFFileName(m_tif_ctx.get()), "No space for scanline buffer");  
     return false;
   }
  // rlbox::tainted<uint8_t*, rlbox::rlbox_wasm2c_sandbox> buf_T = buf;
   for (int32_t row = 0; row < height; row++) {
     uint8_t* bitMapbuffer = pDIBitmap->GetWritableScanline(row).data();
     //invoke sandbox
-   // sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
-    TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
+    size2 = sizeof(*m_tif_ctx.get());
+    s = sandbox.malloc_in_sandbox<Tiff>(size2);
+    rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size2, "writing to memory"), m_tif_ctx.get(), size2);
+    sandbox.invoke_sandbox_function(TIFFReadScanline, s, buf_T, row, 0);
+    s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+    m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp))
+    sandbox.free_in_sandbox(s);
+ 
+   // TIFFReadScanline(m_tif_ctx.get(), buf, row, 0);
     for (int32_t j = 0; j < size - 2; j += 3) {
       bitMapbuffer[j + 0] = buf[j + 2];
       bitMapbuffer[j + 1] = buf[j + 1];
@@ -635,17 +799,34 @@ bool CTiffContext::Decode24bppRGB(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandb
 bool CTiffContext::Decode(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, const RetainPtr<CFX_DIBitmap>& pDIBitmap) {
   uint32_t img_width = pDIBitmap->GetWidth();
   uint32_t img_height = pDIBitmap->GetHeight();
-  uint32_t width = 0;
+
   uint32_t height = 0;
-  auto width_ptr = sandbox.malloc_in_sandbox<uint32_t>();
-  *width_ptr = &width;
+
    auto height_ptr = sandbox.malloc_in_sandbox<uint32_t>();
-  *height_ptr = &height;
   //invoke sandbox
+  auto size = sizeof(*m_tif_ctx.get());
+  auto s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
+
+  uint32_t width = 0;
+  auto width_ptr = sandbox.malloc_in_sandbox<uint32_t>();
+  //TIFFGetField(m_tif_ctx.get(), TIFFTAG_IMAGEWIDTH, &width);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_IMAGEWIDTH, width_ptr);
+  width = *width_ptr;
+  
+  auto s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_IMAGELENGTH, height_ptr);
+  height = *height_ptr;
+  auto s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
   sandbox.free_in_sandbox(width_ptr);
-   sandbox.free_in_sandbox(height_ptr);
+  sandbox.free_in_sandbox(height_ptr);
   //TIFFGetField(m_tif_ctx.get(), TIFFTAG_IMAGEWIDTH, &width);
   //TIFFGetField(m_tif_ctx.get(), TIFFTAG_IMAGELENGTH, &height);
   if (img_width != width || img_height != height)
@@ -655,22 +836,33 @@ bool CTiffContext::Decode(rlbox::rlbox_sandbox<rlbox_noop_sandbox> sandbox, cons
     uint16_t rotation = ORIENTATION_TOPLEFT;
     //invoke sandbox
      auto rotation_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *rotation_ptr = &rotation;
+    size = sizeof(*m_tif_ctx.get());
+    s = sandbox.malloc_in_sandbox<Tiff>(size);
+    rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
     sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_ORIENTATION, rotation_ptr);
-    
+    rotation = *rotation_ptr;
+    auto s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+    m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+     sandbox.free_in_sandbox(s);
     //TIFFGetField(m_tif_ctx.get(), TIFFTAG_ORIENTATION, &rotation);
     //invoke sandbox
-  uint32* temp = (uint32*)pDIBitmap->GetBuffer();
-//   auto temp_T= sandbox.malloc_in_sandbox<uint32_t>(sizeof(temp));
-//   rlbox::memcpy(sandbox, temp_T, temp, sizeof(temp));
-
-//  if(sandbox.invoke_sandbox_function(TIFFReadRGBAImageOriented, s, img_width, img_height, temp_T, rotation, 1).copy_and_verify([](int ret){
-//    //change
-//    return ret;
-//  })) {
-  if (TIFFReadRGBAImageOriented(m_tif_ctx.get(), img_width, img_height,
-                               (uint32*)pDIBitmap->GetBuffer(), rotation,
-                                1)) {
+    uint32* temp = (uint32*)pDIBitmap->GetBuffer();
+  auto temp_T= sandbox.malloc_in_sandbox<uint32_t>(sizeof(temp));
+  rlbox::memcpy(sandbox, temp_T, temp, sizeof(temp));
+   size = sizeof(*m_tif_ctx.get());
+    s = sandbox.malloc_in_sandbox<Tiff>(size);
+    rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
+  auto bool1 = sandbox.invoke_sandbox_function(TIFFReadRGBAImageOriented, s, img_width, img_height, temp_T, rotation, 1).copy_and_verify([](int ret){
+   //change
+   return ret;
+ });
+ s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+    m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+     sandbox.free_in_sandbox(s);
+ if(bool1) {
+  // if (TIFFReadRGBAImageOriented(m_tif_ctx.get(), img_width, img_height,
+  //                              (uint32*)pDIBitmap->GetBuffer(), rotation,
+  //                               1)) {
       for (uint32_t row = 0; row < img_height; row++) {
         uint8_t* row_buf = pDIBitmap->GetWritableScanline(row).data();
         TiffBGRA2RGBA(row_buf, img_width, 4);
@@ -684,12 +876,24 @@ sandbox.free_in_sandbox(rotation_ptr);
   uint16_t bps = 0;
 
   auto spp_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *spp_ptr = &spp;
-   auto bps_ptr = sandbox.malloc_in_sandbox<uint16_t>();
-  *spp_ptr = &spp;
+  auto bps_ptr = sandbox.malloc_in_sandbox<uint16_t>();
   //invoke sandbox
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_SAMPLESPERPIXEL, spp_ptr);
+  spp = *spp_ptr;
+  s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
+  size = sizeof(*m_tif_ctx.get());
+  s = sandbox.malloc_in_sandbox<Tiff>(size);
+  rlbox::memcpy(sandbox, s.unverified_safe_pointer_because(size, "writing to memory"), m_tif_ctx.get(), size);
   sandbox.invoke_sandbox_function(TIFFGetField, s, TIFFTAG_BITSPERSAMPLE, bps_ptr);
+  bps = *bps_ptr;
+   s_temp = s.unverified_safe_pointer_because(size, "only internal function wrote, no passed in arguments used");
+  m_tif_ctx.reset(reinterpret_cast<TIFF*>(s_temp));
+  sandbox.free_in_sandbox(s);
   sandbox.free_in_sandbox(spp_ptr);
   sandbox.free_in_sandbox(bps_ptr);
  // TIFFGetField(m_tif_ctx.get(), TIFFTAG_SAMPLESPERPIXEL, &spp);
